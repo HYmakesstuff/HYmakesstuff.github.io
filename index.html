@@ -1303,6 +1303,43 @@
     .catchup-banner { flex-direction: column; align-items: flex-start; }
     .catchup-banner .cb-actions { width: 100%; }
   }
+  /* ── Calendar cell extras: completed-exam line + compact mobile time ── */
+  .cal-day .day-total .t-short, .cal-day .day-exams .t-short { display: none; }
+  .cal-day .day-exams {
+    margin-top: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent-writing);
+    white-space: nowrap;
+  }
+  .cal-day .day-total + .day-exams { margin-top: 0; }
+  .cal-day .day-total { white-space: nowrap; }
+
+  /* Export / backup tools row */
+  .data-tools { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 18px; }
+  .data-tools .btn { padding: 9px 14px; font-size: 12.5px; }
+
+  /* End / finish confirmation modal */
+  .end-modal { max-width: 420px; }
+  .end-modal h3 { font-family: 'Playfair Display', serif; font-size: 20px; margin-bottom: 8px; }
+  .end-modal p { color: var(--text-muted); font-size: 14px; line-height: 1.5; }
+  .end-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+  .end-actions .btn { width: 100%; justify-content: center; }
+  .end-actions .btn-primary-choice {
+    background: var(--accent-writing); color: #0d0f14; border-color: var(--accent-writing); font-weight: 600;
+  }
+  .end-actions .btn-primary-choice:hover { color: #0d0f14; filter: brightness(1.08); }
+  .ep-source-note { font-size: 11px; color: var(--text-muted); margin: -4px 0 12px; }
+
+  @media (max-width: 600px) {
+    .cal-day .day-total .t-long, .cal-day .day-exams .t-long { display: none; }
+    .cal-day .day-total .t-short, .cal-day .day-exams .t-short { display: inline; }
+    .cal-day .day-exams { font-size: 10px; }
+    .cal-day { padding: 5px; overflow: hidden; }
+    .data-tools { gap: 8px; }
+    .data-tools .btn { flex: 1 1 auto; justify-content: center; padding: 8px 10px; font-size: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -1428,7 +1465,7 @@
     </div>
     <div class="header-controls">
       <button class="ctrl-btn" onclick="togglePause()" id="pause-btn">⏸ Pause</button>
-      <button class="ctrl-btn danger" onclick="resetToSetup()">✕ End</button>
+      <button class="ctrl-btn danger" onclick="requestEndSession()">✕ End</button>
     </div>
     <div class="phase-progress-bar">
       <div class="phase-progress-fill" id="phase-fill"></div>
@@ -1540,6 +1577,11 @@
           <span class="tab-icon">🗓️</span><span class="tab-label">Exam Planner</span>
         </button>
       </div>
+      <div class="data-tools">
+        <button class="btn btn-ghost" onclick="exportSpreadsheet()" title="Every exam and timed session, ready to sort and filter in Excel / Sheets">📊 Download spreadsheet (.xlsx)</button>
+        <button class="btn btn-ghost" onclick="exportBackup()" title="A full copy of your Timely data you can restore later">💾 Backup (.json)</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('restore-file').click()" title="Load a backup file made by Timely">📂 Restore backup</button>
+      </div>
       <div class="cal-summary">
         <div class="cal-summary-box">
           <div class="num" id="cal-month-total">0m</div>
@@ -1597,6 +1639,11 @@
         </button>
       </div>
 
+      <div class="data-tools">
+        <button class="btn btn-ghost" onclick="exportSpreadsheet()" title="Every exam and timed session, ready to sort and filter in Excel / Sheets">📊 Download spreadsheet (.xlsx)</button>
+        <button class="btn btn-ghost" onclick="exportBackup()" title="A full copy of your Timely data you can restore later">💾 Backup (.json)</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('restore-file').click()" title="Load a backup file made by Timely">📂 Restore backup</button>
+      </div>
       <p class="preset-card-intro" style="margin-bottom:16px;">Click a day to plan an upcoming exam, log one you've already sat, tick it off once it's done, or jump straight into the timer with its reading/writing time (and any "questions to ignore" adjustment) pre-filled.</p>
 
       <div id="ep-catchup-banner"></div>
@@ -1639,36 +1686,31 @@
       <div class="grid-2" style="margin-bottom:10px;">
         <div class="form-group" style="margin-bottom:0;">
           <label>Subject</label>
-          <select id="ep-quick-subject">
-            <option>Mathematical Methods</option>
-            <option>Specialist Mathematics</option>
-            <option>General Mathematics</option>
-            <option>English</option>
-            <option>Biology</option>
-            <option>Chemistry</option>
-            <option>Physics</option>
-            <option>Psychology</option>
-            <option>Accounting</option>
-            <option>Legal Studies</option>
-            <option>Other</option>
-          </select>
+          <select id="ep-quick-subject" onchange="onPlannerSubjectChange()"></select>
         </div>
         <div class="form-group" style="margin-bottom:0;">
-          <label>Label <span class="optional-tag">(optional)</span></label>
-          <input type="text" id="ep-quick-label" placeholder="e.g. 'Heffernan', 'Topic test'" maxlength="60">
+          <label>Source <span class="optional-tag">(optional)</span></label>
+          <select id="ep-publisher">
+            <option value="Other">Not specified / other</option>
+            <option value="VCAA">VCAA</option>
+            <option value="VCAA (NHT)">VCAA (NHT)</option>
+            <option value="Heffernan">Heffernan</option>
+            <option value="TSSM">TSSM</option>
+            <option value="Kilbaha">Kilbaha</option>
+            <option value="NEAP">NEAP</option>
+            <option value="MAV">MAV</option>
+            <option value="Insight">Insight</option>
+            <option value="QATS">QATS</option>
+            <option value="School">School / teacher</option>
+          </select>
         </div>
       </div>
-
-      <div class="variant-row" style="margin-bottom:16px;">
-        <button type="button" class="variant-btn" onclick="quickAddPaper(1)">
-          <span class="vb-title">➕ Exam 1</span>
-          <span class="vb-time">15m reading · 60m writing</span>
-        </button>
-        <button type="button" class="variant-btn" onclick="quickAddPaper(2)">
-          <span class="vb-title">➕ Exam 2</span>
-          <span class="vb-time">15m reading · 120m writing</span>
-        </button>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>Label <span class="optional-tag">(optional)</span></label>
+        <input type="text" id="ep-quick-label" placeholder="e.g. 'Topic test', 'Trial 2'" maxlength="60">
       </div>
+
+      <div class="variant-row" id="ep-quick-buttons" style="margin-bottom:16px;"></div>
 
       <details class="ep-quickfill">
         <summary>Custom exam, or match a past paper for "questions to ignore" ▾</summary>
@@ -1679,34 +1721,20 @@
         </div>
 
         <div class="variant-label" style="margin:0 0 10px;">Match a Methods practice paper — auto-applies the "questions to ignore" time adjustment if that paper has one:</div>
-        <div class="grid-3">
-          <div class="form-group" style="margin-bottom:0;">
-            <label>Publisher</label>
-            <select id="ep-publisher">
-              <option value="VCAA">VCAA</option>
-              <option value="VCAA (NHT)">VCAA (NHT)</option>
-              <option value="Heffernan">Heffernan</option>
-              <option value="TSSM">TSSM</option>
-              <option value="Kilbaha">Kilbaha</option>
-              <option value="NEAP">NEAP</option>
-              <option value="MAV">MAV</option>
-              <option value="Insight">Insight</option>
-              <option value="QATS">QATS</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
+        <div class="grid-2">
           <div class="form-group" style="margin-bottom:0;">
             <label>Year</label>
             <input type="number" id="ep-year" placeholder="2024" min="2010" max="2035">
           </div>
-          <div class="form-group" style="margin-bottom:0;">
+          <div class="form-group" style="margin-bottom:0;" id="ep-paper-group">
             <label>Paper</label>
-            <select id="ep-paper">
+            <select id="ep-paper" onchange="syncPlannerTimeFields()">
               <option value="1">Exam 1</option>
               <option value="2" selected>Exam 2</option>
             </select>
           </div>
         </div>
+        <p class="ep-source-note" style="margin-top:10px;">Uses the Source chosen above. The “questions to ignore” list only covers Mathematical Methods papers.</p>
         <button type="button" class="btn btn-ghost" onclick="applyPlannerLookup()">🔎 Look up &amp; fill times</button>
         <div class="preset-summary" id="ep-lookup-summary"></div>
         <input type="hidden" id="ep-note-hidden" value="">
@@ -1728,6 +1756,17 @@
   </div>
 </div>
 
+<!-- End / finish confirmation -->
+<div class="day-modal-overlay" id="end-modal-overlay" onclick="if(event.target===this) cancelEndModal()">
+  <div class="day-modal end-modal">
+    <h3 id="end-modal-title">End this session?</h3>
+    <p id="end-modal-text"></p>
+    <div class="end-actions" id="end-modal-actions"></div>
+  </div>
+</div>
+
+<input type="file" id="restore-file" accept=".json,application/json" style="display:none" onchange="restoreBackup(this)">
+
 <!-- Flash notification -->
 <div class="flash" id="flash">
   <span id="flash-icon">📢</span>
@@ -1748,6 +1787,7 @@ let started = false;
 let warned5 = false, warned1 = false;
 let currentExamName = 'Exam';
 let sessionLogged = false; // guards against double-logging a single session's time
+let sessionStartMs = 0;      // Date.now() when the running session began
 let activePlannedExam = null; // { key: 'YYYY-MM-DD', id } when the running session was launched from the Exam Planner, so finishing it can auto-check it off
 
 // Wall-clock anchored state — eliminates setInterval drift
@@ -1824,14 +1864,41 @@ const VCE_SUBJECTS = [
   { name: 'Applied Computing: Data Analytics', category: 'Arts, Tech & Applied', reading: 15, writing: 120 },
   { name: 'Applied Computing: Software Development', category: 'Arts, Tech & Applied', reading: 15, writing: 120 },
   { name: 'Algorithmics (HESS)', category: 'Arts, Tech & Applied', reading: 15, writing: 120 },
+  { name: 'Art Creative Practice', category: 'Arts, Tech & Applied', reading: 15, writing: 90 },
+  { name: 'Art Making and Exhibiting', category: 'Arts, Tech & Applied', reading: 15, writing: 90 },
+  { name: 'Agricultural and Horticultural Studies', category: 'Arts, Tech & Applied', reading: 15, writing: 90 },
+  { name: 'Dance', category: 'Arts, Tech & Applied', reading: 15, writing: 90 },
+  { name: 'Drama', category: 'Arts, Tech & Applied', reading: 15, writing: 90 },
+  { name: 'Theatre Studies', category: 'Arts, Tech & Applied', reading: 15, writing: 90 },
+  { name: 'Music Composition', category: 'Arts, Tech & Applied', reading: 15, writing: 60 },
+  { name: 'Music Inquiry', category: 'Arts, Tech & Applied', reading: 15, writing: 60 },
+  { name: 'Classical Studies', category: 'Humanities & Commerce', reading: 15, writing: 120 },
+  { name: 'Outdoor and Environmental Studies', category: 'Humanities & Commerce', reading: 15, writing: 120 },
+  { name: 'Industry and Enterprise', category: 'Humanities & Commerce', reading: 15, writing: 120 },
 ];
 
+/* The reading/writing options a subject offers: one entry per paper.
+   Subjects with two exams (the Maths subjects) give two; everything else
+   gives one. Returns null for a custom/unknown subject. */
+function getSubjectExams(subjectName) {
+  const s = VCE_SUBJECTS.find(x => x.name === subjectName);
+  if (!s) return null;
+  if (s.variants) {
+    return s.variants.map((v, i) => ({ paper: i + 1, label: v.label, reading: v.reading, writing: v.writing }));
+  }
+  return [{ paper: null, label: 'Exam', reading: s.reading, writing: s.writing }];
+}
+
 function formatDurationMin(mins) {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (h > 0 && m > 0) return `${h}h ${m}m`;
-  if (h > 0) return `${h}h`;
-  return `${m}m`;
+  const totalSec = Math.round((Number(mins) || 0) * 60);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const parts = [];
+  if (h) parts.push(h + 'h');
+  if (m) parts.push(m + 'm');
+  if (s) parts.push(s + 's');
+  return parts.length ? parts.join(' ') : '0m';
 }
 
 function populatePresetSelect() {
@@ -1944,7 +2011,9 @@ function renderSubjectList() {
 }
 
 function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /* Keeps every copy of the tab bar (setup/calendar/planner/done screens all
@@ -1979,11 +2048,12 @@ function launchTimer(examName, readingSecs, writingSecs, ignoreNote) {
 
   if (readingTotal + writingTotal === 0) {
     showFlash('⚠️', 'Please set at least some time!', 'danger');
-    return;
+    return false;
   }
 
   currentExamName = examName || 'Exam';
   sessionLogged = false;
+  sessionStartMs = Date.now();
 
   // Footer static info
   document.getElementById('f-reading').textContent = formatTime(readingTotal);
@@ -2021,6 +2091,18 @@ function launchTimer(examName, readingSecs, writingSecs, ignoreNote) {
   } else {
     beginPhase('writing');
   }
+  return true;
+}
+
+/* Details saved with every timed session (used by the calendar + export). */
+function currentSessionMeta(completed) {
+  return {
+    completed: !!completed,
+    startedAt: sessionStartMs || 0,
+    plannedSeconds: readingTotal + writingTotal,
+    planKey: activePlannedExam ? activePlannedExam.key : null,
+    planId: activePlannedExam ? activePlannedExam.id : null,
+  };
 }
 
 /* ═══════════════════ PHASE ═══════════════════ */
@@ -2169,13 +2251,15 @@ function showDone() {
   tickGeneration++; // invalidate any in-flight tick chain
   cancelAnimationFrame(rafId);
   clearInterval(timerInterval);
+  const planned = activePlannedExam;
   if (!sessionLogged && totalElapsedMs > 0) {
-    logStudySession(currentExamName, totalElapsedMs / 1000);
+    logStudySession(currentExamName, totalElapsedMs / 1000, currentSessionMeta(true));
   }
-  if (activePlannedExam) {
-    setExamEntryDone(activePlannedExam.key, activePlannedExam.id, true);
+  if (planned) {
+    setExamEntryDone(planned.key, planned.id, true, { sessionDate: dateKey(new Date()) });
     activePlannedExam = null;
   }
+  document.getElementById('end-modal-overlay').classList.remove('show');
   document.getElementById('timer-screen').style.display = 'none';
   document.getElementById('calendar-screen').style.display = 'none';
   document.getElementById('exam-planner-screen').style.display = 'none';
@@ -2184,6 +2268,7 @@ function showDone() {
   document.getElementById('d-elapsed').textContent = formatTime(Math.floor(totalElapsedMs / 1000));
   const name = document.getElementById('t-exam-name').textContent;
   document.getElementById('done-sub').textContent = `${name} — well done, pens down!`;
+  updateActiveTab('setup');
 }
 
 /* ═══════════════════ CONTROLS ═══════════════════ */
@@ -2197,6 +2282,8 @@ function togglePause() {
     // Pausing — record how much time is left
     isPaused = true;
     pausedRemaining = Math.max(0, phaseEndTimestamp - Date.now());
+    totalElapsedMs = elapsedAtPhaseStart + (totalSeconds * 1000 - pausedRemaining);
+    updateElapsed();
     cancelAnimationFrame(rafId);
     tickGeneration++; // invalidate any in-flight tick immediately
     pb.textContent = '▶';
@@ -2213,7 +2300,20 @@ function togglePause() {
   }
 }
 
-function skipPhase() {
+/* Skip button / → key. Skipping reading time goes straight through; skipping
+   writing time FINISHES the exam (and ticks it off), so that needs a confirm
+   and can never be triggered by an accidental key press. */
+function skipPhase(fromKeyboard) {
+  if (!started || phase === 'done') return;
+  if (phase === 'writing') {
+    if (fromKeyboard === true) return;
+    openEndModal('finish');
+    return;
+  }
+  doSkipPhase();
+}
+
+function doSkipPhase() {
   if (!started) return;
   // If paused, phaseEndTimestamp is stale (frozen at pause time) while
   // Date.now() keeps advancing, so recomputing from it here would credit
@@ -2254,7 +2354,7 @@ function addTime(secs) {
 function resetToSetup() {
   // Ended early via the "End" button — still bank whatever time was studied.
   if (started && phase !== 'done' && !sessionLogged && totalElapsedMs > 0) {
-    logStudySession(currentExamName, totalElapsedMs / 1000);
+    logStudySession(currentExamName, totalElapsedMs / 1000, currentSessionMeta(false));
   }
   cancelAnimationFrame(rafId);
   tickGeneration++; // invalidate any in-flight tick immediately
@@ -2270,9 +2370,73 @@ function resetToSetup() {
   document.getElementById('calendar-screen').style.display = 'none';
   document.getElementById('exam-planner-screen').style.display = 'none';
   document.getElementById('setup-screen').style.display = 'block';
+  document.getElementById('end-modal-overlay').classList.remove('show');
   closeDayModal();
   closeExamDayModal();
   updateActiveTab('setup');
+}
+
+/* ── End / finish confirmation ──
+   The ✕ End button no longer ends instantly. It pauses the clock and asks,
+   so a stray tap can't throw away an exam — and for a planned exam it lets
+   you say whether you actually finished it (which ticks it off). */
+let endModalResume = false;
+
+function requestEndSession() {
+  if (!started || phase === 'done') { resetToSetup(); return; }
+  openEndModal('end');
+}
+
+function openEndModal(mode) {
+  if (document.getElementById('end-modal-overlay').classList.contains('show')) return;
+  endModalResume = !isPaused;
+  if (!isPaused) togglePause();
+
+  const title = document.getElementById('end-modal-title');
+  const text = document.getElementById('end-modal-text');
+  const actions = document.getElementById('end-modal-actions');
+  const spent = formatDurationShort(totalElapsedMs / 1000);
+  const planned = !!activePlannedExam;
+  actions.innerHTML = '';
+
+  const addBtn = (label, cls, fn) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn-ghost ' + (cls || '');
+    b.textContent = label;
+    b.onclick = fn;
+    actions.appendChild(b);
+  };
+
+  if (mode === 'finish') {
+    title.textContent = 'Finish the exam now?';
+    text.textContent = planned
+      ? 'This ends your writing time and ticks the exam off as completed in your Exam Planner.'
+      : 'This ends your writing time and saves your time to the Study Calendar.';
+    addBtn('✅ Yes, I\'m finished', 'btn-primary-choice', () => { closeEndModal(); doSkipPhase(); });
+  } else if (planned) {
+    title.textContent = 'End this exam?';
+    text.textContent = `You've spent ${spent} on it. Did you finish the exam?`;
+    addBtn('✅ I finished — mark it completed', 'btn-primary-choice', () => { closeEndModal(); showDone(); });
+    addBtn('End without ticking it off', '', () => { closeEndModal(); resetToSetup(); });
+  } else {
+    title.textContent = 'End this session?';
+    text.textContent = `The ${spent} you've spent so far will be saved to your Study Calendar.`;
+    addBtn('End & save my time', 'btn-primary-choice', () => { closeEndModal(); resetToSetup(); });
+  }
+  addBtn('Keep going', '', cancelEndModal);
+  document.getElementById('end-modal-overlay').classList.add('show');
+}
+
+function closeEndModal() {
+  document.getElementById('end-modal-overlay').classList.remove('show');
+}
+
+function cancelEndModal() {
+  if (!document.getElementById('end-modal-overlay').classList.contains('show')) return;
+  closeEndModal();
+  if (endModalResume && started && phase !== 'done' && isPaused) togglePause();
+  endModalResume = false;
 }
 
 /* ═══════════════════ UI ═══════════════════ */
@@ -2409,36 +2573,102 @@ async function persistSet(key, value) {
   }
 }
 
+/* Keeps an unreadable/corrupt save from being silently overwritten: the raw
+   text is copied to a "-unreadable-backup" key before anything replaces it. */
+async function backupUnreadable(key, raw) {
+  try { if (raw) await persistSet(key + '-unreadable-backup', raw); } catch (e) { /* nothing more we can do */ }
+}
+
+function isPlainObject(x) { return x && typeof x === 'object' && !Array.isArray(x); }
+
 async function loadStudyLog() {
   if (studyLogLoaded) return;
+  let raw = null;
   try {
-    const raw = await persistGet('study-log');
-    studyLog = raw ? JSON.parse(raw) : {};
+    raw = await persistGet('study-log');
+    const parsed = raw ? JSON.parse(raw) : {};
+    studyLog = isPlainObject(parsed) ? parsed : {};
   } catch (e) {
-    studyLog = {}; // nothing saved yet
+    studyLog = {};
+    await backupUnreadable('study-log', raw);
   }
   studyLogLoaded = true;
 }
 
 async function saveStudyLog() {
   try {
+    await loadStudyLog(); // never write before the saved copy has been read
     await persistSet('study-log', JSON.stringify(studyLog));
   } catch (e) {
     console.error('Could not save study log', e);
   }
 }
 
-function logStudySession(examName, seconds) {
-  seconds = Math.round(seconds);
-  if (seconds <= 0) return;
-  const key = dateKey(new Date());
-  if (!studyLog[key]) studyLog[key] = {};
-  studyLog[key][examName] = (studyLog[key][examName] || 0) + seconds;
-  sessionLogged = true;
-  saveStudyLog();
-  if (document.getElementById('calendar-screen').style.display !== 'none') {
-    renderCalendar();
+/* Detailed record of every timer session (start/end time, whether it ran to
+   the end, which planner exam it belonged to…). The per-day totals above
+   stay exactly as before; this list is additive and powers the export. */
+let studySessions = [];
+let studySessionsLoaded = false;
+
+async function loadStudySessions() {
+  if (studySessionsLoaded) return;
+  let raw = null;
+  try {
+    raw = await persistGet('study-sessions');
+    const parsed = raw ? JSON.parse(raw) : [];
+    studySessions = Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    studySessions = [];
+    await backupUnreadable('study-sessions', raw);
   }
+  studySessionsLoaded = true;
+}
+
+async function saveStudySessions() {
+  try {
+    await loadStudySessions();
+    await persistSet('study-sessions', JSON.stringify(studySessions));
+  } catch (e) {
+    console.error('Could not save study sessions', e);
+  }
+}
+
+/* Load everything the moment the page opens. Previously data was only read
+   when you opened a calendar screen, so finishing a session first could
+   overwrite your saved history with just that one session. */
+async function initData() {
+  await Promise.all([loadStudyLog(), loadStudySessions(), loadExamPlan(), loadTotalExamsCompleted()]);
+}
+
+async function logStudySession(examName, seconds, meta) {
+  seconds = Math.round(seconds);
+  if (!(seconds > 0)) return;
+  sessionLogged = true; // set synchronously so a second call can never double-log
+  meta = meta || {};
+  const now = new Date();
+  const key = dateKey(now);
+  await Promise.all([loadStudyLog(), loadStudySessions()]);
+  if (!isPlainObject(studyLog[key])) studyLog[key] = {};
+  studyLog[key][examName] = (Number(studyLog[key][examName]) || 0) + seconds;
+  studySessions.push({
+    id: 's' + now.getTime().toString(36) + Math.random().toString(36).slice(2, 6),
+    date: key,
+    startedAt: meta.startedAt || (now.getTime() - seconds * 1000),
+    endedAt: now.getTime(),
+    name: examName,
+    seconds,
+    plannedSeconds: meta.plannedSeconds || 0,
+    completed: !!meta.completed,
+    planKey: meta.planKey || null,
+    planId: meta.planId || null,
+  });
+  await Promise.all([saveStudyLog(), saveStudySessions()]);
+  refreshOpenScreens();
+}
+
+function refreshOpenScreens() {
+  if (document.getElementById('calendar-screen').style.display === 'flex') renderCalendar();
+  if (document.getElementById('exam-planner-screen').style.display === 'flex') renderExamPlanner();
 }
 
 async function openCalendar() {
@@ -2448,7 +2678,7 @@ async function openCalendar() {
   document.getElementById('exam-planner-screen').style.display = 'none';
   document.getElementById('calendar-screen').style.display = 'flex';
   calendarViewDate = new Date();
-  await loadStudyLog();
+  await initData();
   renderCalendar();
   updateActiveTab('calendar');
 }
@@ -2469,14 +2699,65 @@ function goToCurrentMonth() {
   renderCalendar();
 }
 
+/* Whole minutes are rounded FIRST and only then split into hours + minutes,
+   so 59m 40s can never come out as "1h 60m". */
 function formatDurationShort(seconds) {
-  seconds = Math.round(seconds);
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
+  seconds = Math.max(0, Math.round(Number(seconds) || 0));
+  const totalMin = Math.round(seconds / 60);
+  if (totalMin === 0) return seconds > 0 ? '<1m' : '0m';
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
   if (h > 0 && m > 0) return `${h}h ${m}m`;
   if (h > 0) return `${h}h`;
-  if (m > 0) return `${m}m`;
-  return '<1m';
+  return `${m}m`;
+}
+
+/* Extra-compact label for narrow phone screens: 1h25, 2h, 45m */
+function formatDurationTiny(seconds) {
+  seconds = Math.max(0, Math.round(Number(seconds) || 0));
+  const totalMin = Math.round(seconds / 60);
+  if (totalMin === 0) return seconds > 0 ? '<1m' : '0m';
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0 && m > 0) return `${h}h${pad(m)}`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
+/* ── Merging timed sessions and ticked-off planner exams ──
+   An exam you ticked off in the Exam Planner is a completed exam even if you
+   never used the timer for it, so it must show on the Study Calendar too.
+   Timed time comes from studyLog; each completed planner exam is matched to
+   its timed time by name (once each), and anything left over is a plain
+   timer session. Same-name exams on one day are counted separately. */
+function buildCompletedByDay() {
+  const map = {};
+  Object.keys(examPlan).forEach(key => {
+    (Array.isArray(examPlan[key]) ? examPlan[key] : []).forEach(entry => {
+      if (!entry || !entry.done) return;
+      const day = entry.sessionDate || key;
+      (map[day] = map[day] || []).push({ key, entry });
+    });
+  });
+  return map;
+}
+
+function buildDayInfo(day, completedByDay) {
+  const log = isPlainObject(studyLog[day]) ? studyLog[day] : {};
+  const used = new Set();
+  const items = [];
+  (completedByDay[day] || []).forEach(({ entry }) => {
+    const name = plannedTimerName(entry);
+    const hit = [name, entry.name].find(n => Number(log[n]) > 0 && !used.has(n));
+    if (hit) used.add(hit);
+    items.push({ kind: 'exam', name, logName: hit || null, secs: hit ? Number(log[hit]) : 0, entry });
+  });
+  Object.keys(log).forEach(n => {
+    const s = Number(log[n]) || 0;
+    if (s > 0 && !used.has(n)) items.push({ kind: 'session', name: n, logName: n, secs: s });
+  });
+  const timedTotal = Object.values(log).reduce((a, v) => a + (Number(v) || 0), 0);
+  return { items, timedTotal };
 }
 
 function renderCalendar() {
@@ -2488,6 +2769,7 @@ function renderCalendar() {
   const startWeekday = firstOfMonth.getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayKey = dateKey(new Date());
+  const completedByDay = buildCompletedByDay();
 
   const grid = document.getElementById('cal-grid');
   grid.innerHTML = '';
@@ -2506,82 +2788,98 @@ function renderCalendar() {
   }
 
   let monthTotalSeconds = 0;
-  let monthSessionDays = 0;
-  const examTotalsMonth = {};
+  let monthActiveDays = 0;
+  let monthExams = 0;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const key = `${year}-${pad(month + 1)}-${pad(day)}`;
-    const dayData = studyLog[key];
-    const entries = dayData ? Object.entries(dayData) : [];
+    const info = buildDayInfo(key, completedByDay);
+    const examCount = info.items.length;
 
     const cell = document.createElement('div');
     cell.className = 'cal-day';
     if (key === todayKey) cell.classList.add('today');
 
-    let dayTotal = 0;
-    entries.forEach(([name, secs]) => {
-      dayTotal += secs;
-      examTotalsMonth[name] = (examTotalsMonth[name] || 0) + secs;
-    });
-
-    if (dayTotal > 0) {
+    if (info.timedTotal > 0 || examCount > 0) {
       cell.classList.add('has-data');
-      monthTotalSeconds += dayTotal;
-      monthSessionDays++;
+      monthActiveDays++;
+      monthTotalSeconds += info.timedTotal;
+      monthExams += examCount;
     }
 
-    const shownDots = entries.slice(0, 4)
-      .map(([name]) => `<span class="cal-dot" style="background:var(${examColorVar(name)})"></span>`)
-      .join('');
-    const extra = entries.length > 4 ? `<span class="dot-more">+${entries.length - 4}</span>` : '';
+    const dots = info.items.slice(0, 4).map(it => it.kind === 'exam'
+      ? `<span class="ep-dot done" style="--dc:var(${examCategoryColorVar(it.entry)})"></span>`
+      : `<span class="cal-dot" style="background:var(${examColorVar(it.name)})"></span>`).join('');
+    const extra = info.items.length > 4 ? `<span class="dot-more">+${info.items.length - 4}</span>` : '';
+    const doneExams = info.items.filter(it => it.kind === 'exam').length;
 
-    cell.innerHTML = `
-      <span class="day-num">${day}</span>
-      ${dayTotal > 0 ? `<span class="day-dots">${shownDots}${extra}</span><span class="day-total">${formatDurationShort(dayTotal)}</span>` : ''}
-    `;
+    let inner = `<span class="day-num">${day}</span>`;
+    if (examCount > 0) inner += `<span class="day-dots">${dots}${extra}</span>`;
+    if (info.timedTotal > 0) {
+      inner += `<span class="day-total"><span class="t-long">${formatDurationShort(info.timedTotal)}</span><span class="t-short">${formatDurationTiny(info.timedTotal)}</span></span>`;
+    }
+    if (doneExams > 0) inner += `<span class="day-exams"><span class="t-long">✓ ${doneExams} exam${doneExams > 1 ? 's' : ''}</span><span class="t-short">✓${doneExams}</span></span>`;
+    cell.innerHTML = inner;
     cell.onclick = () => showDayDetail(key);
     grid.appendChild(cell);
   }
 
   document.getElementById('cal-month-total').textContent = formatDurationShort(monthTotalSeconds);
-  document.getElementById('cal-month-days').textContent = monthSessionDays;
-  document.getElementById('cal-month-exams').textContent = Object.keys(examTotalsMonth).length;
+  document.getElementById('cal-month-days').textContent = monthActiveDays;
+  document.getElementById('cal-month-exams').textContent = monthExams;
 }
 
+let dayModalKey = null;
+let dayModalItems = [];
+
 function showDayDetail(key) {
+  dayModalKey = key;
   const [y, m, d] = key.split('-').map(Number);
   const dateObj = new Date(y, m - 1, d);
   document.getElementById('day-modal-title').textContent =
     dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  const dayData = studyLog[key] || {};
-  const entries = Object.entries(dayData).sort((a, b) => b[1] - a[1]);
+  const info = buildDayInfo(key, buildCompletedByDay());
+  dayModalItems = info.items;
   const list = document.getElementById('day-modal-list');
   const totalEl = document.getElementById('day-modal-total');
 
-  if (entries.length === 0) {
-    list.innerHTML = `<p class="day-empty">No study sessions recorded on this day.</p>`;
+  if (info.items.length === 0) {
+    list.innerHTML = `<p class="day-empty">No study sessions or exams recorded on this day.</p>`;
     totalEl.textContent = '';
   } else {
-    const total = entries.reduce((sum, [, secs]) => sum + secs, 0);
-    list.innerHTML = entries.map(([name, secs]) => `
-      <div class="exam-row">
-        <span class="cal-dot" style="background:var(${examColorVar(name)})"></span>
-        <span class="exam-row-name">${escHtml(name)}</span>
-        <span class="exam-row-time">${formatDurationShort(secs)}</span>
-        <button class="ep-del-btn" onclick="deleteStudyEntry('${key}','${name.replace(/'/g, "\\'")}')" title="Delete this entry — use if a time looks wrong">🗑</button>
-      </div>`).join('');
-    totalEl.textContent = `Total: ${formatDurationShort(total)}`;
+    const sorted = info.items.map((it, i) => ({ it, i }))
+      .sort((a, b) => (a.it.kind === b.it.kind ? b.it.secs - a.it.secs : (a.it.kind === 'exam' ? -1 : 1)));
+    list.innerHTML = sorted.map(({ it, i }) => {
+      const dot = it.kind === 'exam'
+        ? `<span class="ep-dot done" style="--dc:var(${examCategoryColorVar(it.entry)})"></span>`
+        : `<span class="cal-dot" style="background:var(${examColorVar(it.name)})"></span>`;
+      const label = it.kind === 'exam' ? `✓ ${escHtml(it.name)}` : escHtml(it.name);
+      const time = it.secs > 0 ? formatDurationShort(it.secs) : 'no timer';
+      const del = it.secs > 0
+        ? `<button class="ep-del-btn" onclick="deleteDayItem(${i})" title="${it.kind === 'exam' ? 'Delete the logged time (the exam stays ticked off)' : 'Delete this entry — use if a time looks wrong'}">🗑</button>`
+        : '';
+      return `<div class="exam-row">${dot}<span class="exam-row-name">${label}</span><span class="exam-row-time">${time}</span>${del}</div>`;
+    }).join('');
+    const exams = info.items.filter(it => it.kind === 'exam').length;
+    const parts = [];
+    if (info.timedTotal > 0) parts.push(`Timed: ${formatDurationShort(info.timedTotal)}`);
+    if (exams > 0) parts.push(`${exams} exam${exams > 1 ? 's' : ''} completed`);
+    totalEl.textContent = parts.join(' · ');
   }
 
   document.getElementById('day-modal-overlay').classList.add('show');
 }
 
-function deleteStudyEntry(key, name) {
-  if (!studyLog[key]) return;
-  delete studyLog[key][name];
+function deleteDayItem(i) {
+  const it = dayModalItems[i];
+  const key = dayModalKey;
+  if (!it || !it.logName || !key || !isPlainObject(studyLog[key])) return;
+  delete studyLog[key][it.logName];
   if (Object.keys(studyLog[key]).length === 0) delete studyLog[key];
+  studySessions = studySessions.filter(s => !(s.date === key && s.name === it.logName));
   saveStudyLog();
+  saveStudySessions();
   showDayDetail(key);
   renderCalendar();
 }
@@ -2600,6 +2898,8 @@ let examPlan = {};              // { 'YYYY-MM-DD': [ {id, name, reading, writing
 let examPlanLoaded = false;
 let plannerViewDate = new Date();
 let currentExamDayKey = null;
+let lastPlannerSubject = 'Mathematical Methods'; // remembered between adds so repeat entries are quick
+let lastPlannerSource = 'Other';
 let totalExamsCompleted = 0;     // all-time count — auto-tracked, but the person can also edit it directly
 let totalExamsCompletedLoaded = false;
 
@@ -2673,44 +2973,147 @@ function findIgnoreEntry(publisher, year, paper) {
   return QUESTIONS_TO_IGNORE.find(e => e.publisher === publisher && e.year === year && e.paper === paper) || null;
 }
 
-/* One-click add for the common case: just "did/planning Exam 1" or "Exam 2",
-   no publisher or year needed. Uses the standard VCAA Methods timing. */
-function quickAddPaper(paper) {
-  if (!currentExamDayKey) return;
-  const subject = document.getElementById('ep-quick-subject').value || 'Mathematical Methods';
-  const label = document.getElementById('ep-quick-label').value.trim();
-  const name = label ? `Exam ${paper} — ${label}` : `Exam ${paper}`;
-  const reading = 15;
-  const writing = paper === 1 ? 60 : 120;
+/* The name a planner exam runs (and is logged) under. Including the subject
+   keeps "Exam 1" of two different subjects from merging into one calendar
+   entry. */
+function plannedTimerName(entry) {
+  const subject = entry && entry.subject;
+  const name = (entry && entry.name) || 'Exam';
+  if (!subject || subject === 'Other') return name;
+  return name.toLowerCase().includes(String(subject).toLowerCase()) ? name : `${subject} — ${name}`;
+}
 
-  if (!examPlan[currentExamDayKey]) examPlan[currentExamDayKey] = [];
-  examPlan[currentExamDayKey].push({
-    id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    name, reading, writing, note: '',
-    subject, source: 'Other', // quick-add has no publisher — grouped under "Other" for colouring
-    done: false,
-    completedAt: null,
+function newId(prefix) {
+  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+/* Fill the planner's Subject dropdown from the same VCAA list the Timer's
+   presets use, so a subject's times are defined in exactly one place. */
+function populatePlannerSubjectSelect() {
+  const sel = document.getElementById('ep-quick-subject');
+  sel.innerHTML = '';
+  const groups = [];
+  VCE_SUBJECTS.forEach(s => {
+    let g = groups.find(x => x.name === s.category);
+    if (!g) { g = { name: s.category, items: [] }; groups.push(g); }
+    g.items.push(s);
   });
+  groups.forEach(g => {
+    const og = document.createElement('optgroup');
+    og.label = g.name;
+    g.items.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.name;
+      o.textContent = s.name;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+  const other = document.createElement('option');
+  other.value = 'Other';
+  other.textContent = 'Other / custom subject';
+  sel.appendChild(other);
+}
 
+/* One big button per exam the chosen subject has, each showing its real
+   VCAA reading + writing time. Subjects with a single exam get one button;
+   the Maths subjects get Exam 1 and Exam 2. */
+function renderQuickExamButtons() {
+  const sel = document.getElementById('ep-quick-subject');
+  const box = document.getElementById('ep-quick-buttons');
+  const details = document.querySelector('#exam-day-modal-overlay .ep-quickfill');
+  const opts = getSubjectExams(sel.value);
+  box.innerHTML = '';
+  if (!opts) {
+    box.innerHTML = '<p class="variant-label" style="margin:0;">Custom subject — give it a name and set its times below, then add it.</p>';
+    if (details) details.open = true;
+    return;
+  }
+  opts.forEach((o, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'variant-btn';
+    const title = opts.length > 1 ? `➕ Exam ${o.paper}` : '➕ Add exam';
+    const tech = opts.length > 1 ? (o.label.split('— ')[1] || '') : '';
+    btn.innerHTML = `<span class="vb-title">${escHtml(title)}</span>` +
+      `<span class="vb-time">${tech ? escHtml(tech) + ' · ' : ''}${o.reading}m reading · ${escHtml(formatDurationMin(o.writing))} writing</span>`;
+    btn.onclick = () => quickAddExam(i);
+    box.appendChild(btn);
+  });
+}
+
+/* Keeps the custom form's reading/writing boxes (and the Exam 1/2 chooser)
+   in step with the subject, so the allocated time is always the VCAA one. */
+function syncPlannerTimeFields() {
+  const subject = document.getElementById('ep-quick-subject').value;
+  const opts = getSubjectExams(subject);
+  const paperGroup = document.getElementById('ep-paper-group');
+  if (paperGroup) paperGroup.style.display = (opts && opts.length > 1) ? '' : 'none';
+  if (!opts) return;
+  const paper = parseInt(document.getElementById('ep-paper').value) || 2;
+  const o = opts.length > 1 ? opts[Math.min(Math.max(paper, 1), opts.length) - 1] : opts[0];
+  document.getElementById('ep-reading').value = o.reading;
+  document.getElementById('ep-writing').value = o.writing;
+}
+
+function onPlannerSubjectChange() {
+  lastPlannerSubject = document.getElementById('ep-quick-subject').value;
+  renderQuickExamButtons();
+  syncPlannerTimeFields();
+  // any "questions to ignore" lookup result belonged to the previous subject
+  document.getElementById('ep-note-hidden').value = '';
+  const summary = document.getElementById('ep-lookup-summary');
+  summary.style.display = 'none';
+  summary.innerHTML = '';
+}
+
+function pushExamEntry(fields) {
+  const key = currentExamDayKey;
+  if (!key) return;
+  if (!Array.isArray(examPlan[key])) examPlan[key] = [];
+  examPlan[key].push(Object.assign({ id: newId('e'), done: false, completedAt: null }, fields));
+  lastPlannerSubject = fields.subject;
+  lastPlannerSource = fields.source;
   saveExamPlan();
-  renderExamDayEntries(currentExamDayKey);
+  renderExamDayEntries(key);
   renderExamPlanner();
-  showFlash('✅', `${name} added`, 'writing');
+}
+
+/* One-click add: the chosen subject's own VCAA times, optional label. */
+function quickAddExam(i) {
+  if (!currentExamDayKey) return;
+  const subject = document.getElementById('ep-quick-subject').value;
+  const opts = getSubjectExams(subject);
+  if (!opts || !opts[i]) return;
+  const o = opts[i];
+  const label = document.getElementById('ep-quick-label').value.trim();
+  const base = opts.length > 1 ? `Exam ${o.paper}` : 'Exam';
+  const name = label ? `${base} — ${label}` : base;
+  pushExamEntry({
+    name, label, reading: o.reading, writing: o.writing, note: '',
+    subject, source: document.getElementById('ep-publisher').value || 'Other',
+    paper: o.paper,
+  });
+  showFlash('✅', `${subject} ${base} added`, 'writing');
 }
 
 async function loadExamPlan() {
   if (examPlanLoaded) return;
+  let raw = null;
   try {
-    const raw = await persistGet('exam-plan');
-    examPlan = raw ? JSON.parse(raw) : {};
+    raw = await persistGet('exam-plan');
+    const parsed = raw ? JSON.parse(raw) : {};
+    examPlan = isPlainObject(parsed) ? parsed : {};
   } catch (e) {
-    examPlan = {}; // nothing saved yet
+    examPlan = {};
+    await backupUnreadable('exam-plan', raw);
   }
   examPlanLoaded = true;
 }
 
 async function saveExamPlan() {
   try {
+    await loadExamPlan();
     await persistSet('exam-plan', JSON.stringify(examPlan));
   } catch (e) {
     console.error('Could not save exam plan', e);
@@ -2730,6 +3133,7 @@ async function loadTotalExamsCompleted() {
 
 async function saveTotalExamsCompleted() {
   try {
+    await loadTotalExamsCompleted();
     await persistSet('exam-total-completed', String(totalExamsCompleted));
   } catch (e) {
     console.error('Could not save total exams completed', e);
@@ -2754,11 +3158,18 @@ function setTotalExamsCompleted(val) {
 /* Single place that flips an entry's done state AND keeps the all-time
    counter in sync — used by both the checkbox toggle and the timer's
    auto-complete-on-finish path, so the count is never bumped twice. */
-function setExamEntryDone(key, id, done) {
+function setExamEntryDone(key, id, done, extra) {
   const entry = (examPlan[key] || []).find(e => e.id === id);
-  if (!entry || entry.done === done) return entry || null;
+  if (!entry) return null;
+  if (entry.done === done) {
+    // already in this state (e.g. re-sitting a ticked exam): no count change,
+    // but still record the day of the latest timed sitting
+    if (done && extra && extra.sessionDate) { entry.sessionDate = extra.sessionDate; saveExamPlan(); }
+    return entry;
+  }
   entry.done = done;
   entry.completedAt = done ? Date.now() : null;
+  entry.sessionDate = done && extra && extra.sessionDate ? extra.sessionDate : null;
   totalExamsCompleted = Math.max(0, totalExamsCompleted + (done ? 1 : -1));
   saveExamPlan();
   saveTotalExamsCompleted();
@@ -2773,8 +3184,7 @@ async function openExamPlanner() {
   document.getElementById('calendar-screen').style.display = 'none';
   document.getElementById('exam-planner-screen').style.display = 'flex';
   plannerViewDate = new Date();
-  await loadExamPlan();
-  await loadTotalExamsCompleted();
+  await initData();
   renderExamPlanner();
   renderTotalExamsCompleted();
   updateActiveTab('planner');
@@ -2827,7 +3237,7 @@ function renderExamPlanner() {
 
   for (let day = 1; day <= daysInMonth; day++) {
     const key = `${year}-${pad(month + 1)}-${pad(day)}`;
-    const entries = examPlan[key] || [];
+    const entries = Array.isArray(examPlan[key]) ? examPlan[key] : [];
 
     const cell = document.createElement('div');
     cell.className = 'cal-day';
@@ -2839,6 +3249,8 @@ function renderExamPlanner() {
       monthTotal += entries.length;
       monthDone += doneCount;
       const allDone = doneCount === entries.length;
+      const cellLabel = allDone ? `✓ ${doneCount} done`
+        : (doneCount > 0 ? `${doneCount}/${entries.length} done` : `${entries.length} exam${entries.length > 1 ? 's' : ''}`);
 
       entries.forEach(e => categoriesSeen.set(examCategoryKey(e), examCategoryColorVar(e)));
 
@@ -2850,7 +3262,7 @@ function renderExamPlanner() {
       cell.innerHTML = `
         <span class="day-num">${day}</span>
         <span class="day-dots">${dots}${extra}</span>
-        <span class="day-total">${allDone ? '✓ done' : `${entries.length} exam${entries.length > 1 ? 's' : ''}`}</span>
+        <span class="day-total">${cellLabel}</span>
       `;
     } else {
       cell.innerHTML = `<span class="day-num">${day}</span>`;
@@ -2909,8 +3321,10 @@ function renderCatchUpBanner() {
 
   if (missed.length === 0 || catchUpDismissed) {
     el.innerHTML = '';
+    el.className = '';
     return;
   }
+  el.className = 'catchup-banner'; // this wrapper never had the class, so the banner rendered unstyled
 
   const preview = missed.slice(0, 3).map(({ key, entry }) => {
     const [y, m, d] = key.split('-').map(Number);
@@ -2974,22 +3388,28 @@ function closeExamDayModal() {
 function resetPlannerForm() {
   document.getElementById('ep-name').value = '';
   document.getElementById('ep-note-hidden').value = '';
-  document.getElementById('ep-quick-subject').value = 'Mathematical Methods';
+  const sel = document.getElementById('ep-quick-subject');
+  sel.value = lastPlannerSubject;
+  if (sel.value !== lastPlannerSubject) sel.value = 'Mathematical Methods';
   document.getElementById('ep-quick-label').value = '';
-  document.getElementById('ep-publisher').value = 'VCAA';
+  const src = document.getElementById('ep-publisher');
+  src.value = lastPlannerSource;
+  if (src.value !== lastPlannerSource) src.value = 'Other';
   document.getElementById('ep-year').value = '';
   document.getElementById('ep-paper').value = '2';
-  document.getElementById('ep-reading').value = 15;
-  document.getElementById('ep-writing').value = 120;
   const details = document.querySelector('#exam-day-modal-overlay .ep-quickfill');
   if (details) details.open = false;
+  renderQuickExamButtons();   // (opens the custom section itself for a custom subject)
+  syncPlannerTimeFields();
   const summary = document.getElementById('ep-lookup-summary');
   summary.style.display = 'none';
   summary.innerHTML = '';
 }
 
+function safeId(s) { return /^[\w-]+$/.test(String(s)) ? String(s) : ''; }
+
 function renderExamDayEntries(key) {
-  const entries = examPlan[key] || [];
+  const entries = Array.isArray(examPlan[key]) ? examPlan[key] : [];
   const list = document.getElementById('ep-entry-list');
 
   if (entries.length === 0) {
@@ -2999,24 +3419,25 @@ function renderExamDayEntries(key) {
 
   list.innerHTML = entries.map(e => `
     <div class="exam-plan-row">
-      <button class="ep-check ${e.done ? 'checked' : ''}" onclick="toggleExamDone('${key}','${e.id}')" title="${e.done ? 'Mark as not done' : 'Mark as done'}">${e.done ? '✓' : ''}</button>
+      <button class="ep-check ${e.done ? 'checked' : ''}" onclick="toggleExamDone('${key}','${safeId(e.id)}')" title="${e.done ? 'Mark as not done' : 'Mark as done'}">${e.done ? '✓' : ''}</button>
       <div class="ep-row-main">
         <div class="ep-row-name">
           <span class="ep-cat-dot" style="background:var(${examCategoryColorVar(e)})"></span>${escHtml(e.name)}
         </div>
-        <div class="ep-row-meta">${e.reading}m read · ${formatDurationMin(Math.round(e.writing))} write${e.note ? ' · ' + escHtml(e.note) : ''}</div>
+        <div class="ep-row-meta">${escHtml(String(e.reading))}m read · ${escHtml(formatDurationMin(e.writing))} write${e.note ? ' · ' + escHtml(e.note) : ''}</div>
         <div class="ep-row-cat">${escHtml(examCategoryKey(e))}</div>
       </div>
-      <button class="ep-start-btn" onclick="startPlannedExam('${key}','${e.id}')" title="Start exam timer">▶</button>
-      <button class="ep-del-btn" onclick="deleteExamEntry('${key}','${e.id}')" title="Delete">🗑</button>
+      <button class="ep-start-btn" onclick="startPlannedExam('${key}','${safeId(e.id)}')" title="Start exam timer">▶</button>
+      <button class="ep-del-btn" onclick="deleteExamEntry('${key}','${safeId(e.id)}')" title="Delete">🗑</button>
     </div>
   `).join('');
 }
 
 function applyPlannerLookup() {
+  const subject = document.getElementById('ep-quick-subject').value;
   const publisher = document.getElementById('ep-publisher').value;
   const year = parseInt(document.getElementById('ep-year').value);
-  const paper = parseInt(document.getElementById('ep-paper').value);
+  const paper = parseInt(document.getElementById('ep-paper').value) || 2;
   const paperLabel = paper === 1 ? 'Exam 1' : 'Exam 2';
   const summary = document.getElementById('ep-lookup-summary');
 
@@ -3027,23 +3448,27 @@ function applyPlannerLookup() {
 
   const nameField = document.getElementById('ep-name');
   if (!nameField.value.trim()) {
-    nameField.value = `${publisher} ${year} ${paperLabel}`;
+    nameField.value = `${publisher === 'Other' ? '' : publisher + ' '}${year} ${paperLabel}`;
   }
 
-  document.getElementById('ep-reading').value = 15;
+  // Standard times for this subject/paper (the VCAA ones), before any adjustment
+  const opts = getSubjectExams(subject);
+  const std = opts ? (opts.length > 1 ? opts[Math.min(paper, opts.length) - 1] : opts[0]) : { reading: 15, writing: paper === 1 ? 60 : 120 };
+  document.getElementById('ep-reading').value = std.reading;
 
-  const match = findIgnoreEntry(publisher, year, paper);
-  const defaultWriting = paper === 1 ? 60 : 120;
+  const match = subject === 'Mathematical Methods' ? findIgnoreEntry(publisher, year, paper) : null;
 
   summary.style.display = 'block';
   if (match) {
     document.getElementById('ep-writing').value = match.minutes;
     document.getElementById('ep-note-hidden').value = `Skip: ${match.ignore}`;
-    summary.innerHTML = `<strong>Questions to ignore:</strong> ${escHtml(match.ignore)} — new total ${match.newTotal} marks, so ${match.minutes} min writing (15 min reading unaffected).`;
+    summary.innerHTML = `<strong>Questions to ignore:</strong> ${escHtml(match.ignore)} — new total ${match.newTotal} marks, so ${escHtml(formatDurationMin(match.minutes))} writing (${std.reading} min reading unaffected).`;
   } else {
-    document.getElementById('ep-writing').value = defaultWriting;
+    document.getElementById('ep-writing').value = std.writing;
     document.getElementById('ep-note-hidden').value = '';
-    summary.innerHTML = `No listed question adjustments for this paper — using standard ${paperLabel} timing (15 min reading + ${formatDurationMin(defaultWriting)} writing).`;
+    summary.innerHTML = subject === 'Mathematical Methods'
+      ? `No listed question adjustments for this paper — using standard ${paperLabel} timing (${std.reading} min reading + ${escHtml(formatDurationMin(std.writing))} writing).`
+      : `The “questions to ignore” list only covers Mathematical Methods papers — using ${escHtml(subject)}'s standard timing (${std.reading} min reading + ${escHtml(formatDurationMin(std.writing))} writing).`;
   }
 }
 
@@ -3056,23 +3481,25 @@ function addExamEntry() {
   }
   const reading = Math.max(0, parseInt(document.getElementById('ep-reading').value) || 0);
   const writing = Math.max(0, parseFloat(document.getElementById('ep-writing').value) || 0);
+  if (reading + writing === 0) {
+    showFlash('⚠️', 'Set a reading or writing time first', 'danger');
+    return;
+  }
   const note = document.getElementById('ep-note-hidden').value || '';
-  const subject = document.getElementById('ep-quick-subject').value || 'Mathematical Methods';
+  const subject = document.getElementById('ep-quick-subject').value || 'Other';
   const source = document.getElementById('ep-publisher').value || 'Other';
+  const opts = getSubjectExams(subject);
+  const paper = (opts && opts.length > 1) ? (parseInt(document.getElementById('ep-paper').value) || null) : null;
 
-  if (!examPlan[currentExamDayKey]) examPlan[currentExamDayKey] = [];
-  examPlan[currentExamDayKey].push({
-    id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    name, reading, writing, note,
-    subject, source,
-    done: false,
-    completedAt: null,
+  pushExamEntry({
+    name, label: document.getElementById('ep-quick-label').value.trim(), reading, writing, note,
+    subject, source, paper,
   });
-
-  saveExamPlan();
-  renderExamDayEntries(currentExamDayKey);
-  renderExamPlanner();
-  resetPlannerForm();
+  document.getElementById('ep-name').value = '';
+  document.getElementById('ep-note-hidden').value = '';
+  const summary = document.getElementById('ep-lookup-summary');
+  summary.style.display = 'none';
+  summary.innerHTML = '';
   showFlash('✅', 'Exam added to planner', 'writing');
 }
 
@@ -3102,49 +3529,516 @@ function deleteExamEntry(key, id) {
 function startPlannedExam(key, id) {
   const entry = (examPlan[key] || []).find(e => e.id === id);
   if (!entry) return;
+  const readingSecs = Math.max(0, Math.round((Number(entry.reading) || 0) * 60));
+  const writingSecs = Math.max(0, Math.round((Number(entry.writing) || 0) * 60));
+  // Check BEFORE hiding the planner — an exam with no time used to leave a blank screen
+  if (readingSecs + writingSecs === 0) {
+    showFlash('⚠️', 'This exam has no reading or writing time set', 'danger');
+    return;
+  }
   closeExamDayModal();
-  document.getElementById('exam-planner-screen').style.display = 'none';
-  activePlannedExam = { key, id };
   subjects = []; // quick-start bypasses the setup screen's Subjects/Sections card
-  launchTimer(entry.name, entry.reading * 60, entry.writing * 60, entry.note);
+  activePlannedExam = { key, id };
+  const ok = launchTimer(plannedTimerName(entry), readingSecs, writingSecs, entry.note);
+  if (!ok) activePlannedExam = null;
 }
 
 /* ═══════════════════ KEYBOARD ═══════════════════ */
+function timerScreenVisible() {
+  return document.getElementById('timer-screen').style.display === 'flex';
+}
+
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
+  const tag = e.target && e.target.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+  if (e.key === 'Escape') {
+    cancelEndModal();
+    closeDayModal();
+    closeExamDayModal();
+    return;
+  }
+  // Shortcuts only act on the running timer, and never while a dialog is open
+  if (!timerScreenVisible() || document.querySelector('.day-modal-overlay.show')) return;
   if (e.code === 'Space') { e.preventDefault(); togglePause(); }
-  if (e.code === 'ArrowRight') skipPhase();
+  if (e.code === 'ArrowRight') skipPhase(true);
+});
+
+// A focused button would otherwise ALSO "click" itself when Space is released,
+// toggling twice (or re-adding 5 minutes). Swallow that while the timer runs.
+document.addEventListener('keyup', e => {
+  if (e.code === 'Space' && timerScreenVisible()) e.preventDefault();
 });
 
 /* ── Cross-tab sync ──
    The browser's "storage" event fires in *other* tabs/windows of the same
    site whenever localStorage changes — never in the tab that made the
-   change. Without this, having the site open in two tabs could mean one
-   tab's edits get silently clobbered when the other tab later saves its
-   own (now-stale) copy. Reload whichever data changed and re-render if
-   that screen happens to be open right now. Only relevant once hosted
-   outside Claude, where localStorage (not window.storage) is in use. */
+   change. Reload whichever data changed and re-render the open screen. */
 window.addEventListener('storage', e => {
   if (!e.key) return; // fires with key=null on localStorage.clear()
   if (e.key === 'study-log') {
     studyLogLoaded = false;
-    loadStudyLog().then(() => {
-      if (document.getElementById('calendar-screen').style.display === 'flex') renderCalendar();
-    });
+    loadStudyLog().then(refreshOpenScreens);
+  } else if (e.key === 'study-sessions') {
+    studySessionsLoaded = false;
+    loadStudySessions();
   } else if (e.key === 'exam-plan') {
     examPlanLoaded = false;
-    loadExamPlan().then(() => {
-      if (document.getElementById('exam-planner-screen').style.display === 'flex') renderExamPlanner();
-    });
+    loadExamPlan().then(refreshOpenScreens);
   } else if (e.key === 'exam-total-completed') {
     totalExamsCompletedLoaded = false;
     loadTotalExamsCompleted().then(renderTotalExamsCompleted);
   }
 });
 
+/* ═══════════════════ EXPORT & BACKUP ═══════════════════
+   A self-contained .xlsx writer (no libraries, so it works offline on
+   GitHub Pages): an .xlsx file is just a zip of XML files. */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function makeZipBlob(files, mime) {
+  const enc = new TextEncoder();
+  const parts = [];
+  const central = [];
+  let offset = 0;
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  files.forEach(f => {
+    const nameBytes = enc.encode(f.name);
+    const data = enc.encode(f.data);
+    const crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, dosTime, true); lh.setUint16(12, dosDate, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true);
+    lh.setUint16(26, nameBytes.length, true); lh.setUint16(28, 0, true);
+    parts.push(new Uint8Array(lh.buffer), nameBytes, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+    ch.setUint16(10, 0, true); ch.setUint16(12, dosTime, true); ch.setUint16(14, dosDate, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, nameBytes.length, true);
+    ch.setUint16(30, 0, true); ch.setUint16(32, 0, true); ch.setUint16(34, 0, true); ch.setUint16(36, 0, true);
+    ch.setUint32(38, 0, true); ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), nameBytes);
+    offset += 30 + nameBytes.length + data.length;
+  });
+  let cenSize = 0;
+  central.forEach(c => { cenSize += c.length; });
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(4, 0, true); end.setUint16(6, 0, true);
+  end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cenSize, true); end.setUint32(16, offset, true); end.setUint16(20, 0, true);
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: mime });
+}
+
+function xmlEsc(s) {
+  return String(s)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function colLetter(idx) {
+  let n = idx + 1, s = '';
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
+// style ids → see styles.xml below
+const XS = { DEFAULT: 0, HEADER: 1, DATE: 2, DURATION: 3, TIME: 4, DECIMAL: 5, PERCENT: 6 };
+const cText = v => (v === null || v === undefined || v === '') ? null : { t: 's', v: String(v) };
+const cNum = (v, s) => (v === null || v === undefined || !isFinite(v)) ? null : { t: 'n', v: Number(v), s: s || 0 };
+const cDate = key => {
+  if (!key) return null;
+  const [y, m, d] = key.split('-').map(Number);
+  return { t: 'n', v: Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000), s: XS.DATE };
+};
+const cDuration = secs => (secs === null || secs === undefined || !isFinite(secs)) ? null : { t: 'n', v: secs / 86400, s: XS.DURATION };
+const cTimeOfDay = ms => {
+  if (!ms) return null;
+  const d = new Date(ms);
+  return { t: 'n', v: (d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()) / 86400, s: XS.TIME };
+};
+const cMinutes = secs => (secs === null || secs === undefined || !isFinite(secs)) ? null : { t: 'n', v: Math.round(secs / 6) / 10, s: XS.DECIMAL };
+
+function sheetXml(sheet) {
+  const { headers, rows, widths } = sheet;
+  const lastCol = colLetter(headers.length - 1);
+  let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' +
+    '<sheetFormatPr defaultRowHeight="15"/>';
+  xml += '<cols>' + widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('') + '</cols>';
+  xml += '<sheetData>';
+  xml += '<row r="1" ht="32" customHeight="1">' + headers.map((h, i) =>
+    `<c r="${colLetter(i)}1" s="${XS.HEADER}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(h)}</t></is></c>`).join('') + '</row>';
+  rows.forEach((row, r) => {
+    const rn = r + 2;
+    let cells = '';
+    row.forEach((cell, c) => {
+      if (!cell) return;
+      const ref = colLetter(c) + rn;
+      if (cell.t === 's') cells += `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(cell.v)}</t></is></c>`;
+      else cells += `<c r="${ref}" s="${cell.s || 0}"><v>${cell.v}</v></c>`;
+    });
+    xml += `<row r="${rn}">${cells}</row>`;
+  });
+  xml += '</sheetData>';
+  xml += `<autoFilter ref="A1:${lastCol}${Math.max(1, rows.length + 1)}"/>`;
+  xml += '</worksheet>';
+  return xml;
+}
+
+function makeXlsxBlob(sheets) {
+  const NS = 'http://schemas.openxmlformats.org/';
+  const files = [];
+  files.push({ name: '[Content_Types].xml', data:
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+    sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') +
+    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+    '</Types>' });
+  files.push({ name: '_rels/.rels', data:
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="' + NS + 'officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+    '</Relationships>' });
+  files.push({ name: 'xl/workbook.xml', data:
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="' + NS + 'officeDocument/2006/relationships">' +
+    '<sheets>' + sheets.map((s, i) => `<sheet name="${xmlEsc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets>' +
+    '</workbook>' });
+  files.push({ name: 'xl/_rels/workbook.xml.rels', data:
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="${NS}officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('') +
+    `<Relationship Id="rId${sheets.length + 1}" Type="${NS}officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
+    '</Relationships>' });
+  files.push({ name: 'xl/styles.xml', data:
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<numFmts count="4"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/><numFmt numFmtId="165" formatCode="[h]:mm:ss"/>' +
+    '<numFmt numFmtId="166" formatCode="h:mm AM/PM"/><numFmt numFmtId="167" formatCode="0.0"/></numFmts>' +
+    '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>' +
+    '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>' +
+    '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF1F2A44"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+    '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="7">' +
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+    '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>' +
+    '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+    '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+    '<xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+    '<xf numFmtId="167" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+    '<xf numFmtId="9" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+    '</cellXfs>' +
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+    '</styleSheet>' });
+  sheets.forEach((s, i) => files.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: sheetXml(s) }));
+  return makeZipBlob(files, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+
+function weekdayName(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-AU', { weekday: 'long' });
+}
+
+function examTypeOf(entry) {
+  if (entry.paper) return 'Exam ' + entry.paper;
+  const m = /\bexam\s*([12])\b/i.exec(entry.name || '');
+  return m ? 'Exam ' + m[1] : '';
+}
+
+function examLabelOf(entry) {
+  if (typeof entry.label === 'string') return entry.label;
+  const i = (entry.name || '').indexOf(' — ');
+  return i >= 0 ? entry.name.slice(i + 3) : '';
+}
+
+function buildExportSheets() {
+  const todayKey = dateKey(new Date());
+  const completedByDay = buildCompletedByDay();
+
+  // timed seconds for each ticked-off planner exam (matched the same way the calendar does)
+  const logSecsByEntry = new Map();
+  Object.keys(completedByDay).forEach(day => {
+    buildDayInfo(day, completedByDay).items.forEach(it => {
+      if (it.kind === 'exam' && it.entry) logSecsByEntry.set(it.entry.id, it.secs);
+    });
+  });
+  const sessionsByPlanId = {};
+  const entryById = {};
+  Object.keys(examPlan).forEach(k => (Array.isArray(examPlan[k]) ? examPlan[k] : []).forEach(e => { if (e) entryById[e.id] = { entry: e, key: k }; }));
+  studySessions.forEach(s => { if (s && s.planId) (sessionsByPlanId[s.planId] = sessionsByPlanId[s.planId] || []).push(s); });
+
+  /* ── Sheet 1: Exam Log — one row per exam ── */
+  const examRows = [];
+  const examRowData = [];
+  Object.keys(examPlan).sort().forEach(key => {
+    (Array.isArray(examPlan[key]) ? examPlan[key] : []).forEach(e => {
+      if (!e) return;
+      const linked = sessionsByPlanId[e.id] || [];
+      const secs = linked.length ? linked.reduce((a, s) => a + (Number(s.seconds) || 0), 0)
+        : (e.done && logSecsByEntry.get(e.id) > 0 ? logSecsByEntry.get(e.id) : null);
+      const status = e.done ? 'Completed' : (key < todayKey ? 'Not done (past date)' : (key === todayKey ? 'Planned (today)' : 'Planned'));
+      const day = e.done && e.sessionDate ? e.sessionDate : key;
+      examRowData.push({ day, e, status, secs, key });
+    });
+  });
+  studySessions.forEach(s => {
+    if (s && !s.planId && s.completed) {
+      examRowData.push({ day: s.date, e: null, session: s, status: 'Completed (timer only)', secs: Number(s.seconds) || 0, key: s.date });
+    }
+  });
+  examRowData.sort((a, b) => a.day.localeCompare(b.day));
+  examRowData.forEach(r => {
+    const e = r.e;
+    if (e) {
+      const planned = (Number(e.reading) || 0) + (Number(e.writing) || 0);
+      examRows.push([
+        cDate(r.day), cText(weekdayName(r.day)), cText(e.subject || 'Mathematical Methods'), cText(examTypeOf(e)),
+        cText(e.source || 'Other'), cText(e.name), cText(examLabelOf(e)), cText(r.status),
+        cNum(Number(e.reading) || 0), cNum(Number(e.writing) || 0, XS.DECIMAL), cNum(planned, XS.DECIMAL), cText(e.note ? String(e.note).replace(/^Skip:\s*/, '') : ''),
+        cDuration(r.secs), cMinutes(r.secs), cText(r.secs > 0 ? 'Yes' : 'No'),
+        e.completedAt ? cDate(dateKey(new Date(e.completedAt))) : null,
+      ]);
+    } else {
+      examRows.push([
+        cDate(r.day), cText(weekdayName(r.day)), cText(''), cText(''), cText(''), cText(r.session.name), cText(''), cText(r.status),
+        null, null, cNum(Math.round((Number(r.session.plannedSeconds) || 0) / 6) / 10, XS.DECIMAL), null,
+        cDuration(r.secs), cMinutes(r.secs), cText('Yes'), null,
+      ]);
+    }
+  });
+
+  /* ── Sheet 2: Timer Sessions — every timed sitting ── */
+  const sessionRows = [];
+  const sessionTmp = [];
+  studySessions.forEach(s => {
+    if (!s || !s.date) return;
+    const p = s.planId ? entryById[s.planId] : null;
+    sessionTmp.push({ date: s.date, sort: s.startedAt || 0, row: [
+      cDate(s.date), cTimeOfDay(s.startedAt), cTimeOfDay(s.endedAt), cText(s.name), cText(p ? (p.entry.subject || '') : ''),
+      cDuration(s.seconds), cMinutes(s.seconds),
+      s.plannedSeconds > 0 ? cMinutes(s.plannedSeconds) : null,
+      s.plannedSeconds > 0 ? cNum(Math.round((s.seconds / s.plannedSeconds) * 1000) / 1000, XS.PERCENT) : null,
+      cText(s.completed ? 'Yes — ran to the end' : 'No — ended early'), cText(s.planId ? 'Yes' : 'No'),
+    ] });
+  });
+  // older time that was saved before detailed sessions existed
+  Object.keys(studyLog).forEach(day => {
+    if (!isPlainObject(studyLog[day])) return;
+    Object.keys(studyLog[day]).forEach(name => {
+      const total = Number(studyLog[day][name]) || 0;
+      const have = studySessions.filter(s => s && s.date === day && s.name === name).reduce((a, s) => a + (Number(s.seconds) || 0), 0);
+      const rest = total - have;
+      if (rest > 5) {
+        sessionTmp.push({ date: day, sort: -1, row: [
+          cDate(day), null, null, cText(name), cText(''), cDuration(rest), cMinutes(rest), null, null,
+          cText('Unknown (older data)'), cText(''),
+        ] });
+      }
+    });
+  });
+  sessionTmp.sort((a, b) => a.date.localeCompare(b.date) || a.sort - b.sort);
+  sessionTmp.forEach(t => sessionRows.push(t.row));
+
+  /* ── Sheet 3: Daily Summary ── */
+  const days = new Set([...Object.keys(studyLog), ...Object.keys(completedByDay)]);
+  Object.keys(examPlan).forEach(k => { if ((Array.isArray(examPlan[k]) ? examPlan[k] : []).some(e => e && !e.done)) days.add(k); });
+  const dailyRows = [];
+  Array.from(days).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().forEach(day => {
+    const info = buildDayInfo(day, completedByDay);
+    const exams = info.items.filter(it => it.kind === 'exam').length;
+    const notDone = (Array.isArray(examPlan[day]) ? examPlan[day] : []).filter(e => e && !e.done).length;
+    const nSessions = studySessions.filter(s => s && s.date === day).length;
+    dailyRows.push([
+      cDate(day), cText(weekdayName(day)), cDuration(info.timedTotal), cMinutes(info.timedTotal),
+      cNum(nSessions), cNum(exams), cNum(notDone),
+    ]);
+  });
+
+  /* ── Sheet 4: Summary by subject & source ── */
+  const groups = {};
+  examRowData.forEach(r => {
+    if (!r.e) return;
+    const subject = r.e.subject || 'Mathematical Methods';
+    const source = r.e.source || 'Other';
+    const g = groups[subject + '||' + source] = groups[subject + '||' + source] || { subject, source, logged: 0, done: 0, timed: 0, secs: 0 };
+    g.logged++;
+    if (r.e.done) g.done++;
+    if (r.secs > 0) { g.timed++; g.secs += r.secs; }
+  });
+  const summaryRows = Object.values(groups).sort((a, b) => a.subject.localeCompare(b.subject) || a.source.localeCompare(b.source)).map(g => [
+    cText(g.subject), cText(g.source), cNum(g.logged), cNum(g.done), cNum(g.logged - g.done), cNum(g.timed),
+    cDuration(g.secs), g.timed > 0 ? cDuration(g.secs / g.timed) : null,
+  ]);
+
+  return [
+    { name: 'Exam Log',
+      headers: ['Date', 'Day', 'Subject', 'Exam type', 'Source', 'Exam name', 'Label', 'Status',
+        'Planned reading (min)', 'Planned writing (min)', 'Planned total (min)', 'Questions skipped',
+        'Time taken (h:mm:ss)', 'Time taken (min)', 'Timer used?', 'Ticked off on'],
+      widths: [12, 11, 26, 11, 14, 30, 20, 22, 11, 11, 11, 22, 13, 11, 9, 12], rows: examRows },
+    { name: 'Timer Sessions',
+      headers: ['Date', 'Start time', 'End time', 'Exam / session', 'Subject', 'Time taken (h:mm:ss)', 'Time taken (min)',
+        'Planned total (min)', 'Share of planned time', 'Ran to the end?', 'From Exam Planner?'],
+      widths: [12, 11, 11, 34, 24, 13, 11, 12, 12, 22, 12], rows: sessionRows },
+    { name: 'Daily Summary',
+      headers: ['Date', 'Day', 'Study time (h:mm:ss)', 'Study time (min)', 'Timer sessions', 'Exams completed', 'Planned, not done'],
+      widths: [12, 12, 14, 12, 10, 12, 12], rows: dailyRows },
+    { name: 'By Subject',
+      headers: ['Subject', 'Source', 'Exams logged', 'Completed', 'Not done', 'Completed with timer', 'Total timed (h:mm:ss)', 'Average per timed exam'],
+      widths: [28, 14, 11, 11, 10, 12, 14, 14], rows: summaryRows },
+  ];
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+async function exportSpreadsheet() {
+  try {
+    await initData();
+    const blob = makeXlsxBlob(buildExportSheets());
+    downloadBlob(blob, `Timely-export-${dateKey(new Date())}.xlsx`);
+    showFlash('📊', 'Spreadsheet downloaded', 'writing');
+  } catch (err) {
+    console.error(err);
+    showFlash('⚠️', 'Could not build the spreadsheet', 'danger');
+  }
+}
+
+async function exportBackup() {
+  try {
+    await initData();
+    const payload = {
+      app: 'Timely', version: 2, exportedAt: new Date().toISOString(),
+      data: { 'study-log': studyLog, 'study-sessions': studySessions, 'exam-plan': examPlan, 'exam-total-completed': totalExamsCompleted },
+    };
+    downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }), `Timely-backup-${dateKey(new Date())}.json`);
+    showFlash('💾', 'Backup downloaded', 'writing');
+  } catch (err) {
+    console.error(err);
+    showFlash('⚠️', 'Could not create the backup', 'danger');
+  }
+}
+
+/* Only well-formed data from a backup file is kept. */
+function sanitizeBackup(d) {
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+  const num = (v, min) => { const n = Number(v); return isFinite(n) && n >= min ? n : null; };
+  const out = { studyLog: {}, studySessions: [], examPlan: {}, total: 0 };
+  if (isPlainObject(d['study-log'])) {
+    Object.keys(d['study-log']).forEach(day => {
+      if (!dateRe.test(day) || !isPlainObject(d['study-log'][day])) return;
+      Object.keys(d['study-log'][day]).forEach(name => {
+        const s = num(d['study-log'][day][name], 1);
+        if (s !== null) { out.studyLog[day] = out.studyLog[day] || {}; out.studyLog[day][name] = Math.round(s); }
+      });
+    });
+  }
+  if (Array.isArray(d['study-sessions'])) {
+    d['study-sessions'].forEach(s => {
+      if (!isPlainObject(s) || !dateRe.test(s.date) || typeof s.name !== 'string' || num(s.seconds, 1) === null) return;
+      out.studySessions.push({
+        id: safeId(s.id) || newId('s'), date: s.date, startedAt: num(s.startedAt, 0) || 0, endedAt: num(s.endedAt, 0) || 0,
+        name: s.name, seconds: Math.round(Number(s.seconds)), plannedSeconds: num(s.plannedSeconds, 0) || 0,
+        completed: !!s.completed, planKey: dateRe.test(s.planKey) ? s.planKey : null, planId: safeId(s.planId) || null,
+      });
+    });
+  }
+  if (isPlainObject(d['exam-plan'])) {
+    Object.keys(d['exam-plan']).forEach(day => {
+      if (!dateRe.test(day) || !Array.isArray(d['exam-plan'][day])) return;
+      const list = [];
+      d['exam-plan'][day].forEach(e => {
+        if (!isPlainObject(e) || typeof e.name !== 'string' || !e.name.trim()) return;
+        list.push({
+          id: safeId(e.id) || newId('e'), name: e.name, label: typeof e.label === 'string' ? e.label : '',
+          reading: num(e.reading, 0) || 0, writing: num(e.writing, 0) || 0, note: typeof e.note === 'string' ? e.note : '',
+          subject: typeof e.subject === 'string' ? e.subject : 'Mathematical Methods',
+          source: typeof e.source === 'string' ? e.source : 'Other',
+          paper: e.paper === 1 || e.paper === 2 ? e.paper : null,
+          done: !!e.done, completedAt: e.done ? (num(e.completedAt, 0) || Date.now()) : null,
+          sessionDate: dateRe.test(e.sessionDate) ? e.sessionDate : null,
+        });
+      });
+      if (list.length) out.examPlan[day] = list;
+    });
+  }
+  out.total = Math.max(0, parseInt(d['exam-total-completed']) || 0);
+  return out;
+}
+
+async function restoreBackup(input) {
+  const file = input.files && input.files[0];
+  input.value = ''; // so choosing the same file again still fires
+  if (!file) return;
+  try {
+    const obj = JSON.parse(await file.text());
+    if (!isPlainObject(obj) || obj.app !== 'Timely' || !isPlainObject(obj.data)) throw new Error('not a Timely backup');
+    const clean = sanitizeBackup(obj.data);
+    const nExams = Object.values(clean.examPlan).reduce((a, l) => a + l.length, 0);
+    const msg = `Restore this backup?\n\nIt contains ${Object.keys(clean.studyLog).length} study day(s), ${nExams} planner exam(s) and a completed count of ${clean.total}.\n\nThis REPLACES the data currently saved in this browser.`;
+    if (!window.confirm(msg)) return;
+    studyLog = clean.studyLog; studyLogLoaded = true;
+    studySessions = clean.studySessions; studySessionsLoaded = true;
+    examPlan = clean.examPlan; examPlanLoaded = true;
+    totalExamsCompleted = clean.total; totalExamsCompletedLoaded = true;
+    await Promise.all([saveStudyLog(), saveStudySessions(), saveExamPlan(), saveTotalExamsCompleted()]);
+    renderTotalExamsCompleted();
+    refreshOpenScreens();
+    showFlash('📂', 'Backup restored', 'writing');
+  } catch (err) {
+    console.error(err);
+    showFlash('⚠️', 'That file is not a valid Timely backup', 'danger');
+  }
+}
+
 /* Init ring */
 document.getElementById('ring').style.strokeDasharray = CIRCUMFERENCE;
 document.getElementById('ring').style.strokeDashoffset = 0;
+
+/* Start-up: fill the planner's subject list, then read every saved record
+   straight away (never wait for a calendar screen to be opened first). */
+populatePlannerSubjectSelect();
+resetPlannerForm();
+initData();
+(function checkStorageWorks() {
+  if (window.storage) return;
+  try {
+    localStorage.setItem('timely-storage-test', '1');
+    localStorage.removeItem('timely-storage-test');
+  } catch (e) {
+    setTimeout(() => showFlash('⚠️', "Your browser is blocking storage, so Timely can't save your data (private window?)", 'danger'), 600);
+  }
+})();
 </script>
 </body>
 </html>
