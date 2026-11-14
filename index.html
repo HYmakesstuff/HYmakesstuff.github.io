@@ -1340,6 +1340,67 @@
     .data-tools { gap: 8px; }
     .data-tools .btn { flex: 1 1 auto; justify-content: center; padding: 8px 10px; font-size: 12px; }
   }
+
+  /* ── TIME (CLOCK) SCREEN — plain wall-clock for exam-condition practice ── */
+  #clock-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 14;
+    flex-direction: column;
+    align-items: center;
+    background: var(--bg);
+    overflow-y: auto;
+    padding: 48px 24px 40px;
+  }
+  #clock-screen::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(108,196,196,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(108,196,196,.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+  }
+  #clock-screen .app-tabs { position: relative; z-index: 1; margin: 0 0 24px; }
+  .clock-body {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 18px;
+  }
+  .clock-time {
+    font-family: 'DM Mono', monospace;
+    font-weight: 400;
+    font-size: clamp(56px, 17vw, 190px);
+    line-height: 1;
+    letter-spacing: -2px;
+    color: var(--accent-teal);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .clock-ampm {
+    font-size: .28em;
+    letter-spacing: 0;
+    margin-left: .15em;
+    color: var(--text-muted);
+  }
+  .clock-date {
+    font-size: clamp(14px, 2.4vw, 20px);
+    color: var(--text-muted);
+    font-weight: 300;
+  }
+  .clock-controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+  #clock-screen.clock-focus .app-tabs,
+  #clock-screen.clock-focus .clock-controls,
+  #clock-screen.clock-focus .clock-date { display: none; }
 </style>
 </head>
 <body>
@@ -1362,6 +1423,9 @@
     </button>
     <button class="app-tab" data-tab="planner" onclick="openExamPlanner()">
       <span class="tab-icon">🗓️</span><span class="tab-label">Exam Planner</span>
+    </button>
+    <button class="app-tab" data-tab="clock" onclick="openClock()">
+      <span class="tab-icon">🕐</span><span class="tab-label">Time</span>
     </button>
   </div>
 
@@ -1549,6 +1613,35 @@
     <button class="app-tab" data-tab="planner" onclick="openExamPlanner()">
       <span class="tab-icon">🗓️</span><span class="tab-label">Exam Planner</span>
     </button>
+    <button class="app-tab" data-tab="clock" onclick="openClock()">
+      <span class="tab-icon">🕐</span><span class="tab-label">Time</span>
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════════════ TIME (CLOCK) SCREEN ════════════════════════ -->
+<div id="clock-screen">
+  <div class="app-tabs">
+    <button class="app-tab" data-tab="setup" onclick="resetToSetup()">
+      <span class="tab-icon">⏱️</span><span class="tab-label">Timer</span>
+    </button>
+    <button class="app-tab" data-tab="calendar" onclick="openCalendar()">
+      <span class="tab-icon">📅</span><span class="tab-label">Study Calendar</span>
+    </button>
+    <button class="app-tab" data-tab="planner" onclick="openExamPlanner()">
+      <span class="tab-icon">🗓️</span><span class="tab-label">Exam Planner</span>
+    </button>
+    <button class="app-tab active" data-tab="clock" onclick="openClock()">
+      <span class="tab-icon">🕐</span><span class="tab-label">Time</span>
+    </button>
+  </div>
+  <div class="clock-body">
+    <div class="clock-time" id="clock-time" aria-live="off">--:--:--</div>
+    <div class="clock-date" id="clock-date"></div>
+    <div class="clock-controls">
+      <button class="btn btn-ghost" id="clock-format-btn" onclick="toggleClockFormat()" title="Switch between 24-hour and 12-hour display">🕐 24-hour</button>
+      <button class="btn btn-ghost" id="clock-focus-btn" onclick="toggleClockFocus()" title="Hide everything except the time (click the clock or press Esc to bring it back)">⛶ Clock only</button>
+    </div>
   </div>
 </div>
 
@@ -1576,6 +1669,9 @@
         <button class="app-tab" data-tab="planner" onclick="openExamPlanner()">
           <span class="tab-icon">🗓️</span><span class="tab-label">Exam Planner</span>
         </button>
+    <button class="app-tab" data-tab="clock" onclick="openClock()">
+      <span class="tab-icon">🕐</span><span class="tab-label">Time</span>
+    </button>
       </div>
       <div class="data-tools">
         <button class="btn btn-ghost" onclick="exportSpreadsheet()" title="Every exam and timed session, ready to sort and filter in Excel / Sheets">📊 Download spreadsheet (.xlsx)</button>
@@ -1637,6 +1733,9 @@
         <button class="app-tab active" data-tab="planner" onclick="openExamPlanner()">
           <span class="tab-icon">🗓️</span><span class="tab-label">Exam Planner</span>
         </button>
+    <button class="app-tab" data-tab="clock" onclick="openClock()">
+      <span class="tab-icon">🕐</span><span class="tab-label">Time</span>
+    </button>
       </div>
 
       <div class="data-tools">
@@ -2081,6 +2180,7 @@ function launchTimer(examName, readingSecs, writingSecs, ignoreNote) {
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('calendar-screen').style.display = 'none';
   document.getElementById('exam-planner-screen').style.display = 'none';
+  stopClock();
   document.getElementById('done-screen').style.display = 'none';
   const ts = document.getElementById('timer-screen');
   ts.style.display = 'flex';
@@ -2263,6 +2363,7 @@ function showDone() {
   document.getElementById('timer-screen').style.display = 'none';
   document.getElementById('calendar-screen').style.display = 'none';
   document.getElementById('exam-planner-screen').style.display = 'none';
+  stopClock();
   const ds = document.getElementById('done-screen');
   ds.style.display = 'flex';
   document.getElementById('d-elapsed').textContent = formatTime(Math.floor(totalElapsedMs / 1000));
@@ -2369,6 +2470,7 @@ function resetToSetup() {
   document.getElementById('done-screen').style.display = 'none';
   document.getElementById('calendar-screen').style.display = 'none';
   document.getElementById('exam-planner-screen').style.display = 'none';
+  stopClock();
   document.getElementById('setup-screen').style.display = 'block';
   document.getElementById('end-modal-overlay').classList.remove('show');
   closeDayModal();
@@ -2676,6 +2778,7 @@ async function openCalendar() {
   document.getElementById('done-screen').style.display = 'none';
   document.getElementById('timer-screen').style.display = 'none';
   document.getElementById('exam-planner-screen').style.display = 'none';
+  stopClock();
   document.getElementById('calendar-screen').style.display = 'flex';
   calendarViewDate = new Date();
   await initData();
@@ -3182,6 +3285,7 @@ async function openExamPlanner() {
   document.getElementById('done-screen').style.display = 'none';
   document.getElementById('timer-screen').style.display = 'none';
   document.getElementById('calendar-screen').style.display = 'none';
+  stopClock();
   document.getElementById('exam-planner-screen').style.display = 'flex';
   plannerViewDate = new Date();
   await initData();
@@ -3543,6 +3647,107 @@ function startPlannedExam(key, id) {
   if (!ok) activePlannedExam = null;
 }
 
+/* ═══════════════════ TIME (CLOCK) TAB ═══════════════════
+   Shows the real time of day as HH:MM:SS (like the clock in a VCAA exam
+   room). Redraws exactly on each second boundary so it never lags. */
+let clockTimeout = null;
+let clock24h = true;
+
+function clockScreenVisible() {
+  return document.getElementById('clock-screen').style.display === 'flex';
+}
+
+function renderClock() {
+  const now = new Date();
+  let h = now.getHours();
+  let suffix = '';
+  if (!clock24h) {
+    suffix = h >= 12 ? 'pm' : 'am';
+    h = h % 12 || 12;
+  }
+  const hh = clock24h ? pad(h) : String(h);
+  const text = hh + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  const el = document.getElementById('clock-time');
+  el.textContent = text;
+  if (suffix) {
+    const span = document.createElement('span');
+    span.className = 'clock-ampm';
+    span.textContent = suffix;
+    el.appendChild(span);
+  }
+  document.getElementById('clock-date').textContent = now.toLocaleDateString(undefined, {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+}
+
+function scheduleClockTick() {
+  clearTimeout(clockTimeout);
+  // Wake just after the next whole second so the display flips in step with the real clock
+  const delay = 1000 - (Date.now() % 1000) + 5;
+  clockTimeout = setTimeout(() => {
+    if (!clockScreenVisible()) { clockTimeout = null; return; }
+    renderClock();
+    scheduleClockTick();
+  }, delay);
+}
+
+function stopClock() {
+  clearTimeout(clockTimeout);
+  clockTimeout = null;
+  const cs = document.getElementById('clock-screen');
+  cs.style.display = 'none';
+  cs.classList.remove('clock-focus');
+}
+
+function openClock() {
+  // Same hand-off as the other tabs: bank any timer session left running
+  if (started && phase !== 'done' && !sessionLogged && totalElapsedMs > 0) {
+    logStudySession(currentExamName, totalElapsedMs / 1000, currentSessionMeta(false));
+  }
+  if (started) {
+    cancelAnimationFrame(rafId);
+    tickGeneration++;
+    clearInterval(timerInterval);
+    phase = 'reading';
+    isPaused = false;
+    started = false;
+    totalElapsedMs = 0;
+    sessionLogged = false;
+    activePlannedExam = null;
+    document.getElementById('end-modal-overlay').classList.remove('show');
+  }
+  ['setup-screen', 'done-screen', 'timer-screen', 'calendar-screen', 'exam-planner-screen']
+    .forEach(id => { document.getElementById(id).style.display = 'none'; });
+  closeDayModal();
+  closeExamDayModal();
+  const cs = document.getElementById('clock-screen');
+  cs.classList.remove('clock-focus');
+  cs.style.display = 'flex';
+  renderClock();
+  scheduleClockTick();
+  updateActiveTab('clock');
+}
+
+function toggleClockFormat() {
+  clock24h = !clock24h;
+  document.getElementById('clock-format-btn').textContent = clock24h ? '🕐 24-hour' : '🕐 12-hour';
+  renderClock();
+}
+
+function toggleClockFocus() {
+  document.getElementById('clock-screen').classList.toggle('clock-focus');
+}
+
+// Click the big clock to leave "clock only" mode
+document.getElementById('clock-time').addEventListener('click', () => {
+  document.getElementById('clock-screen').classList.remove('clock-focus');
+});
+
+// Phones/laptops throttle timers in background tabs — resync on return
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && clockScreenVisible()) { renderClock(); scheduleClockTick(); }
+});
+
 /* ═══════════════════ KEYBOARD ═══════════════════ */
 function timerScreenVisible() {
   return document.getElementById('timer-screen').style.display === 'flex';
@@ -3555,6 +3760,7 @@ document.addEventListener('keydown', e => {
     cancelEndModal();
     closeDayModal();
     closeExamDayModal();
+    document.getElementById('clock-screen').classList.remove('clock-focus');
     return;
   }
   // Shortcuts only act on the running timer, and never while a dialog is open
